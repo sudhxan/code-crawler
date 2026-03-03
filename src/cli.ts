@@ -2,92 +2,65 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { analyzeCode } from './analyzer/index.js';
-import type { AnalysisResult } from './analyzer/index.js';
+import { loadAllAuthorship } from './persistence.js';
+import { generateCommitReport } from './reporter.js';
 
-const CODE_EXTENSIONS = new Set([
-  '.ts', '.tsx', '.js', '.jsx', '.py', '.rb', '.go',
-  '.rs', '.java', '.c', '.cpp', '.cs', '.php', '.swift',
-]);
-
-function collectFiles(target: string): string[] {
-  const stat = fs.statSync(target);
-  if (stat.isFile()) return [target];
-
-  const files: string[] = [];
-  const entries = fs.readdirSync(target, { withFileTypes: true });
-  for (const entry of entries) {
-    if (entry.name.startsWith('.') || entry.name === 'node_modules' || entry.name === 'dist') continue;
-    const fullPath = path.join(target, entry.name);
-    if (entry.isDirectory()) {
-      files.push(...collectFiles(fullPath));
-    } else if (CODE_EXTENSIONS.has(path.extname(entry.name).toLowerCase())) {
-      files.push(fullPath);
-    }
+function findRepoRoot(from: string): string | null {
+  let dir = path.resolve(from);
+  while (dir !== path.dirname(dir)) {
+    if (fs.existsSync(path.join(dir, '.git'))) return dir;
+    dir = path.dirname(dir);
   }
-  return files;
-}
-
-function formatTable(results: AnalysisResult[]): string {
-  const header = `${'File'.padEnd(50)} ${'AI %'.padStart(6)} ${'Human %'.padStart(8)} ${'Confidence'.padStart(11)}`;
-  const separator = '-'.repeat(header.length);
-
-  const rows = results.map(r => {
-    const name = r.filePath.length > 48 ? '...' + r.filePath.slice(-45) : r.filePath;
-    return `${name.padEnd(50)} ${(r.summary.aiPercentage + '%').padStart(6)} ${(r.summary.humanPercentage + '%').padStart(8)} ${(Math.round(r.summary.confidence * 100) + '%').padStart(11)}`;
-  });
-
-  return [separator, header, separator, ...rows, separator].join('\n');
+  return null;
 }
 
 function main(): void {
   const args = process.argv.slice(2);
+  const command = args[0];
 
-  if (args.length === 0 || args.includes('--help') || args.includes('-h')) {
+  if (!command || command === '--help' || command === '-h') {
     console.log(`
-code-crawler - Detect AI-written vs human-written code
+code-crawler - Keystroke-level AI code detection
 
-Usage: code-crawler <file-or-directory> [options]
+Commands:
+  report [path]   Read .code-crawler/ data and display authorship stats
+  status          Show if tracking data exists
 
 Options:
-  --json    Output results as JSON
-  --help    Show this help message
+  --json          Output results as JSON
+  --help          Show this help message
 `);
     process.exit(0);
   }
 
-  const jsonOutput = args.includes('--json');
-  const targets = args.filter(a => !a.startsWith('--'));
+  if (command === 'report') {
+    const target = args[1] || '.';
+    const repoRoot = findRepoRoot(target) || path.resolve(target);
+    const jsonOutput = args.includes('--json');
 
-  const allResults: AnalysisResult[] = [];
-
-  for (const target of targets) {
-    const resolved = path.resolve(target);
-    if (!fs.existsSync(resolved)) {
-      console.error(`Error: ${target} not found`);
-      process.exit(1);
+    const files = loadAllAuthorship(repoRoot);
+    if (files.length === 0) {
+      console.log('No authorship data found. Install the VS Code extension to start tracking.');
+      process.exit(0);
     }
 
-    const files = collectFiles(resolved);
-    for (const file of files) {
-      const content = fs.readFileSync(file, 'utf-8');
-      allResults.push(analyzeCode(content, file));
+    if (jsonOutput) {
+      console.log(JSON.stringify(files, null, 2));
+    } else {
+      console.log('\n' + generateCommitReport(files) + '\n');
     }
-  }
-
-  if (allResults.length === 0) {
-    console.log('No code files found.');
-    process.exit(0);
-  }
-
-  if (jsonOutput) {
-    console.log(JSON.stringify(allResults, null, 2));
+  } else if (command === 'status') {
+    const repoRoot = findRepoRoot('.') || process.cwd();
+    const dataDir = path.join(repoRoot, '.code-crawler', 'authorship');
+    if (fs.existsSync(dataDir)) {
+      const files = loadAllAuthorship(repoRoot);
+      console.log(`Code Crawler: Tracking data found for ${files.length} file(s).`);
+    } else {
+      console.log('Code Crawler: No tracking data found. Install the VS Code extension to start tracking.');
+    }
   } else {
-    console.log('\ncode-crawler Analysis Results\n');
-    console.log(formatTable(allResults));
-
-    const totalAi = allResults.reduce((s, r) => s + r.summary.aiPercentage, 0) / allResults.length;
-    console.log(`\nOverall: ~${Math.round(totalAi)}% likely AI-generated across ${allResults.length} file(s)\n`);
+    console.error(`Unknown command: ${command}. Use --help for usage.`);
+    process.exit(1);
   }
 }
 

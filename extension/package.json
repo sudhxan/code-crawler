@@ -1,35 +1,50 @@
 {
   "name": "code-crawler-vscode",
   "displayName": "Code Crawler - AI Code Detection",
-  "description": "Detect AI-written vs human-written code with inline highlights",
+  "description": "Detect AI-written vs human-written code with real-time keystroke tracking",
   "version": "0.1.0",
   "publisher": "sudhxan",
   "engines": {
     "vscode": "^1.85.0"
   },
-  "categories": ["Other"],
+  "categories": [
+    "Other"
+  ],
   "activationEvents": [
-    "onLanguage:javascript",
-    "onLanguage:typescript",
-    "onLanguage:python",
-    "onLanguage:java",
-    "onLanguage:go",
-    "onLanguage:rust",
-    "onLanguage:c",
-    "onLanguage:cpp"
+    "onStartupFinished"
   ],
   "main": "./dist/extension.js",
   "contributes": {
     "commands": [
       {
-        "command": "codeCrawler.analyzeFile",
-        "title": "Code Crawler: Analyze Current File"
+        "command": "codeCrawler.showReport",
+        "title": "Code Crawler: Show Report"
       },
       {
-        "command": "codeCrawler.analyzeWorkspace",
-        "title": "Code Crawler: Analyze Workspace"
+        "command": "codeCrawler.resetTracking",
+        "title": "Code Crawler: Reset Tracking"
       }
     ],
+    "configuration": {
+      "title": "Code Crawler",
+      "properties": {
+        "codeCrawler.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable or disable Code Crawler tracking"
+        },
+        "codeCrawler.aiThreshold": {
+          "type": "number",
+          "default": 0.5,
+          "description": "AI detection threshold (0-1)"
+        },
+        "codeCrawler.showDecorations": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show line-level authorship decorations"
+        }
+      }
+    },
     "viewsContainers": {
       "activitybar": [
         {
@@ -55,8 +70,8 @@
     "package": "vsce package"
   },
   "devDependencies": {
-    "@types/vscode": "^1.85.0",
     "@types/node": "^20.0.0",
+    "@types/vscode": "^1.109.0",
     "typescript": "^5.4.0"
   }
 }

@@ -1,125 +1,154 @@
 import * as vscode from 'vscode';
-import { applyDecorations, clearDecorations } from './decorations';
+import { EditTracker } from './edit-tracker';
+import { StatusBar } from './status-bar';
+import { applyDecorations, clearDecorations, disposeDecorations } from './decorations';
 import { SidebarProvider } from './sidebar';
-import { CodeCrawlerDetector } from '../../src/analyzer/detector';
-import type { AnalysisResult } from '../../src/analyzer/types';
+import { saveFileAuthorship, loadFileAuthorship } from '../../src/persistence';
+import { generateCommitReport } from '../../src/reporter';
+import { loadAllAuthorship } from '../../src/persistence';
 
-let detector: CodeCrawlerDetector;
+let editTracker: EditTracker;
+let statusBar: StatusBar;
 let sidebarProvider: SidebarProvider;
-let lastResult: AnalysisResult | undefined;
+
+function getWorkspaceRoot(): string | undefined {
+  return vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+}
 
 export function activate(context: vscode.ExtensionContext): void {
-  detector = new CodeCrawlerDetector();
+  editTracker = new EditTracker();
+  statusBar = new StatusBar();
   sidebarProvider = new SidebarProvider(context.extensionUri);
+
+  // Load persisted authorship data for open files
+  const root = getWorkspaceRoot();
+  if (root) {
+    for (const doc of vscode.workspace.textDocuments) {
+      if (doc.uri.scheme === 'file') {
+        const map = loadFileAuthorship(root, doc.uri.fsPath);
+        if (map) {
+          editTracker.setMap(doc.uri.fsPath, map);
+        }
+      }
+    }
+  }
+
+  editTracker.activate(context);
 
   context.subscriptions.push(
     vscode.window.registerWebviewViewProvider('codeCrawler.sidebar', sidebarProvider),
   );
 
+  // Update decorations and status bar on edit
+  let updateTimeout: ReturnType<typeof setTimeout> | undefined;
   context.subscriptions.push(
-    vscode.commands.registerCommand('codeCrawler.analyzeFile', () => analyzeCurrentFile()),
+    editTracker.onUpdate((filePath) => {
+      if (updateTimeout) clearTimeout(updateTimeout);
+      updateTimeout = setTimeout(() => {
+        const editor = vscode.window.activeTextEditor;
+        if (editor && editor.document.uri.fsPath === filePath) {
+          const map = editTracker.getMap(filePath);
+          if (map) {
+            applyDecorations(editor, map);
+            statusBar.update(map);
+          }
+        }
+      }, 200);
+    }),
   );
 
-  context.subscriptions.push(
-    vscode.commands.registerCommand('codeCrawler.analyzeWorkspace', () => analyzeWorkspace()),
-  );
-
+  // Update on active editor change
   context.subscriptions.push(
     vscode.window.onDidChangeActiveTextEditor((editor) => {
-      if (editor) {
-        analyzeEditor(editor);
-      }
-    }),
-  );
-
-  context.subscriptions.push(
-    vscode.workspace.onDidSaveTextDocument((doc) => {
-      const editor = vscode.window.visibleTextEditors.find((e) => e.document === doc);
-      if (editor) {
-        analyzeEditor(editor);
-      }
-    }),
-  );
-
-  if (vscode.window.activeTextEditor) {
-    analyzeEditor(vscode.window.activeTextEditor);
-  }
-}
-
-async function analyzeEditor(editor: vscode.TextEditor): Promise<void> {
-  const doc = editor.document;
-  try {
-    const result = await detector.analyzeContent(
-      doc.getText(),
-      doc.fileName,
-    );
-    lastResult = result;
-    applyDecorations(editor, result);
-    sidebarProvider.updateResults(result);
-  } catch {
-    // Silently skip unsupported files
-  }
-}
-
-async function analyzeCurrentFile(): Promise<void> {
-  const editor = vscode.window.activeTextEditor;
-  if (!editor) {
-    vscode.window.showWarningMessage('No active file to analyze.');
-    return;
-  }
-
-  await vscode.window.withProgress(
-    { location: vscode.ProgressLocation.Notification, title: 'Code Crawler: Analyzing...' },
-    async () => {
-      await analyzeEditor(editor);
-      if (lastResult) {
-        vscode.window.showInformationMessage(
-          `Code Crawler: ${lastResult.summary.aiPercentage.toFixed(1)}% AI, ${lastResult.summary.humanPercentage.toFixed(1)}% Human`,
-        );
-      }
-    },
-  );
-}
-
-async function analyzeWorkspace(): Promise<void> {
-  const files = await vscode.workspace.findFiles(
-    '**/*.{js,ts,py,java,go,rs,c,cpp}',
-    '**/node_modules/**',
-    100,
-  );
-
-  if (files.length === 0) {
-    vscode.window.showWarningMessage('No supported files found in workspace.');
-    return;
-  }
-
-  await vscode.window.withProgress(
-    { location: vscode.ProgressLocation.Notification, title: 'Code Crawler: Analyzing workspace...' },
-    async (progress) => {
-      const results: AnalysisResult[] = [];
-
-      for (let i = 0; i < files.length; i++) {
-        progress.report({ increment: (1 / files.length) * 100, message: files[i].fsPath });
-        const doc = await vscode.workspace.openTextDocument(files[i]);
-        try {
-          const result = await detector.analyzeContent(doc.getText(), files[i].fsPath);
-          results.push(result);
-        } catch {
-          // Skip unsupported files
+      if (editor && editor.document.uri.scheme === 'file') {
+        const map = editTracker.getMap(editor.document.uri.fsPath);
+        if (map) {
+          applyDecorations(editor, map);
+          statusBar.update(map);
+        } else {
+          clearDecorations(editor);
+          statusBar.update(undefined);
         }
       }
-
-      const totalLines = results.reduce((s, r) => s + r.summary.totalLines, 0);
-      const aiLines = results.reduce((s, r) => s + r.summary.aiLines, 0);
-      const aiPct = totalLines > 0 ? ((aiLines / totalLines) * 100).toFixed(1) : '0.0';
-
-      vscode.window.showInformationMessage(
-        `Code Crawler: ${results.length} files analyzed. ${aiPct}% AI-written overall.`,
-      );
-    },
+    }),
   );
+
+  // Save authorship on file save
+  context.subscriptions.push(
+    vscode.workspace.onDidSaveTextDocument((doc) => {
+      const wsRoot = getWorkspaceRoot();
+      if (!wsRoot || doc.uri.scheme !== 'file') return;
+      const map = editTracker.getMap(doc.uri.fsPath);
+      if (map) {
+        saveFileAuthorship(wsRoot, doc.uri.fsPath, map);
+      }
+    }),
+  );
+
+  // Show Report command
+  context.subscriptions.push(
+    vscode.commands.registerCommand('codeCrawler.showReport', () => {
+      const wsRoot = getWorkspaceRoot();
+      if (!wsRoot) {
+        vscode.window.showWarningMessage('No workspace open.');
+        return;
+      }
+      const files = loadAllAuthorship(wsRoot);
+      if (files.length === 0) {
+        vscode.window.showInformationMessage('No authorship data yet. Start editing to track.');
+        return;
+      }
+      const report = generateCommitReport(files);
+      const doc = vscode.workspace.openTextDocument({ content: report, language: 'markdown' });
+      doc.then((d) => vscode.window.showTextDocument(d));
+    }),
+  );
+
+  // Reset Tracking command
+  context.subscriptions.push(
+    vscode.commands.registerCommand('codeCrawler.resetTracking', async () => {
+      const confirm = await vscode.window.showWarningMessage(
+        'Reset all Code Crawler tracking data?',
+        { modal: true },
+        'Reset',
+      );
+      if (confirm === 'Reset') {
+        for (const filePath of editTracker.getAllTrackedFiles()) {
+          editTracker.setMap(filePath, new (await import('../../src/authorship-map')).AuthorshipMap());
+        }
+        const editor = vscode.window.activeTextEditor;
+        if (editor) clearDecorations(editor);
+        statusBar.update(undefined);
+        vscode.window.showInformationMessage('Code Crawler tracking data reset.');
+      }
+    }),
+  );
+
+  // Apply decorations on initial active editor
+  if (vscode.window.activeTextEditor) {
+    const editor = vscode.window.activeTextEditor;
+    const map = editTracker.getMap(editor.document.uri.fsPath);
+    if (map) {
+      applyDecorations(editor, map);
+      statusBar.update(map);
+    }
+  }
+
+  context.subscriptions.push(statusBar);
 }
 
 export function deactivate(): void {
-  clearDecorations();
+  // Save all tracked files on deactivation
+  const root = getWorkspaceRoot();
+  if (root) {
+    for (const filePath of editTracker.getAllTrackedFiles()) {
+      const map = editTracker.getMap(filePath);
+      if (map) {
+        saveFileAuthorship(root, filePath, map);
+      }
+    }
+  }
+
+  disposeDecorations();
+  editTracker.dispose();
 }

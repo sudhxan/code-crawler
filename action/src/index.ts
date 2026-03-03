@@ -1,7 +1,10 @@
 import * as core from '@actions/core';
 import * as github from '@actions/github';
-import { CodeCrawlerDetector } from '../../src/analyzer/detector.js';
-import type { AnalysisResult } from '../../src/analyzer/types.js';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+import { loadAllAuthorship } from '../../src/persistence.js';
+import { generateCommitReport } from '../../src/reporter.js';
+import type { FileAuthorship, AuthorshipSummary } from '../../src/types.js';
 
 async function run(): Promise<void> {
   try {
@@ -24,21 +27,24 @@ async function run(): Promise<void> {
 
     const prNumber = context.payload.pull_request.number;
 
-    const { data: diff } = await octokit.rest.pulls.get({
-      ...context.repo,
-      pull_number: prNumber,
-      mediaType: { format: 'diff' },
-    });
+    // Read authorship data from .code-crawler/ directory
+    const repoRoot = process.env.GITHUB_WORKSPACE || process.cwd();
+    const files = loadAllAuthorship(repoRoot);
 
-    const detector = new CodeCrawlerDetector();
-    const results = await detector.analyzeDiff(diff as unknown as string);
+    if (files.length === 0) {
+      core.info('No Code Crawler authorship data found in repository.');
+      return;
+    }
 
-    const { markdown, aiPct, humanPct } = buildSummary(results, threshold);
+    const overall = computeOverall(files);
+    const aiPct = overall.aiPercentage;
+    const humanPct = overall.humanPercentage;
 
     core.setOutput('ai_percentage', aiPct.toFixed(1));
     core.setOutput('human_percentage', humanPct.toFixed(1));
 
     if (postComment) {
+      const markdown = generateCommitReport(files);
       const body = `## Code Crawler Analysis\n\n${markdown}`;
 
       const { data: comments } = await octokit.rest.issues.listComments({
@@ -75,35 +81,19 @@ async function run(): Promise<void> {
   }
 }
 
-function buildSummary(
-  results: AnalysisResult[],
-  threshold: number,
-): { markdown: string; aiPct: number; humanPct: number } {
-  if (results.length === 0) {
-    return { markdown: 'No files analyzed.', aiPct: 0, humanPct: 100 };
+function computeOverall(files: FileAuthorship[]): AuthorshipSummary {
+  let totalLines = 0, aiLines = 0, humanLines = 0, mixedLines = 0;
+  for (const f of files) {
+    totalLines += f.summary.totalLines;
+    aiLines += f.summary.aiLines;
+    humanLines += f.summary.humanLines;
+    mixedLines += f.summary.mixedLines;
   }
-
-  const rows = results.map((r) => {
-    const flag = r.summary.aiPercentage / 100 > threshold ? ' :warning:' : '';
-    return `| \`${r.filePath}\` | ${r.summary.aiPercentage.toFixed(1)}% | ${r.summary.humanPercentage.toFixed(1)}% | ${(r.summary.confidence * 100).toFixed(0)}% |${flag}`;
-  });
-
-  const totalLines = results.reduce((s, r) => s + r.summary.totalLines, 0);
-  const totalAiLines = results.reduce((s, r) => s + r.summary.aiLines, 0);
-  const aiPct = totalLines > 0 ? (totalAiLines / totalLines) * 100 : 0;
-  const humanPct = 100 - aiPct;
-
-  const markdown = [
-    '| File | AI % | Human % | Confidence | |',
-    '|------|------|---------|------------|---|',
-    ...rows,
-    '',
-    `**Overall: ${aiPct.toFixed(1)}% AI-written, ${humanPct.toFixed(1)}% Human-written** (${results.length} files, ${totalLines} lines)`,
-    '',
-    `> Threshold: ${(threshold * 100).toFixed(0)}%`,
-  ].join('\n');
-
-  return { markdown, aiPct, humanPct };
+  return {
+    totalLines, aiLines, humanLines, mixedLines,
+    aiPercentage: totalLines > 0 ? Math.round((aiLines / totalLines) * 100) : 0,
+    humanPercentage: totalLines > 0 ? Math.round((humanLines / totalLines) * 100) : 0,
+  };
 }
 
 run();
