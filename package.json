@@ -1,0 +1,22 @@
+{
+  "name": "code-crawler",
+  "version": "0.1.0",
+  "description": "Detect AI-written vs human-written code in your codebase",
+  "main": "dist/index.js",
+  "bin": {
+    "code-crawler": "dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "tsc --noEmit"
+  },
+  "keywords": ["ai-detection", "code-analysis", "github-action"],
+  "license": "MIT",
+  "devDependencies": {
+    "typescript": "^5.4.0",
+    "vitest": "^1.6.0",
+    "@types/node": "^20.0.0"
+  }
+}

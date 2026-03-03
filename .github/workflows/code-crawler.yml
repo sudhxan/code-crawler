@@ -1,0 +1,17 @@
+name: Code Crawler Analysis
+on: [pull_request]
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: sudhxan/code-crawler@main
+        with:
+          threshold: '0.5'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -1,0 +1,19 @@
+name: 'Code Crawler - AI Code Detection'
+description: 'Detects AI-written vs human-written code in pull requests'
+inputs:
+  threshold:
+    description: 'AI detection threshold (0-1)'
+    required: false
+    default: '0.5'
+  comment:
+    description: 'Post PR comment with results'
+    required: false
+    default: 'true'
+outputs:
+  ai_percentage:
+    description: 'Percentage of code detected as AI-written'
+  human_percentage:
+    description: 'Percentage of code detected as human-written'
+runs:
+  using: 'node20'
+  main: 'dist/index.js'

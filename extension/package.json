@@ -1,0 +1,62 @@
+{
+  "name": "code-crawler-vscode",
+  "displayName": "Code Crawler - AI Code Detection",
+  "description": "Detect AI-written vs human-written code with inline highlights",
+  "version": "0.1.0",
+  "publisher": "sudhxan",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": ["Other"],
+  "activationEvents": [
+    "onLanguage:javascript",
+    "onLanguage:typescript",
+    "onLanguage:python",
+    "onLanguage:java",
+    "onLanguage:go",
+    "onLanguage:rust",
+    "onLanguage:c",
+    "onLanguage:cpp"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "codeCrawler.analyzeFile",
+        "title": "Code Crawler: Analyze Current File"
+      },
+      {
+        "command": "codeCrawler.analyzeWorkspace",
+        "title": "Code Crawler: Analyze Workspace"
+      }
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "codeCrawler",
+          "title": "Code Crawler",
+          "icon": "$(search)"
+        }
+      ]
+    },
+    "views": {
+      "codeCrawler": [
+        {
+          "type": "webview",
+          "id": "codeCrawler.sidebar",
+          "name": "Analysis"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc -w",
+    "package": "vsce package"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.85.0",
+    "@types/node": "^20.0.0",
+    "typescript": "^5.4.0"
+  }
+}
