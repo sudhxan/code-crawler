@@ -3,7 +3,7 @@
   "displayName": "Code Crawler - AI Code Detection",
   "description": "Detect AI-written vs human-written code with real-time keystroke tracking",
   "version": "0.1.1",
-  "publisher": "sudhxan",
+  "publisher": "Not-for-vibe-coders",
   "repository": {
     "type": "git",
     "url": "https://github.com/sudhxan/code-crawler"
