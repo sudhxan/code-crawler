@@ -2,7 +2,7 @@
   "name": "code-crawler-vscode",
   "displayName": "Code Crawler - AI Code Detection",
   "description": "Detect AI-written vs human-written code with real-time keystroke tracking",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "publisher": "Not-for-vibe-coders",
   "repository": {
     "type": "git",
