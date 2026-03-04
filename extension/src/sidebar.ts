@@ -1,9 +1,10 @@
 import * as vscode from 'vscode';
-import type { AnalysisResult } from '../../src/analyzer/types';
+import type { AuthorshipMap } from '../../src/authorship-map';
 
 export class SidebarProvider implements vscode.WebviewViewProvider {
   private _view?: vscode.WebviewView;
-  private _result?: AnalysisResult;
+  private _map?: AuthorshipMap;
+  private _filePath?: string;
 
   constructor(private readonly _extensionUri: vscode.Uri) { }
 
@@ -17,22 +18,33 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
     this._render();
   }
 
-  updateResults(result: AnalysisResult): void {
-    this._result = result;
+  updateResults(map: AuthorshipMap | undefined, filePath: string): void {
+    this._map = map;
+    this._filePath = filePath;
     this._render();
   }
 
   private _render(): void {
     if (!this._view) return;
 
-    const r = this._result;
-    const aiPct = r ? r.summary.aiPercentage.toFixed(1) : '0.0';
-    const humanPct = r ? r.summary.humanPercentage.toFixed(1) : '0.0';
-    const confidence = r ? (r.summary.confidence * 100).toFixed(0) : '0';
-    const fileName = r ? r.filePath.split('/').pop() || r.filePath : 'No file';
-    const totalLines = r ? r.summary.totalLines : 0;
-    const aiLines = r ? r.summary.aiLines : 0;
-    const humanLines = r ? r.summary.humanLines : 0;
+    let totalLines = 0, aiLines = 0, humanLines = 0, aiPct = '0.0', humanPct = '0.0', confidence = '0';
+    let fileName = this._filePath ? this._filePath.split(/[\/\\]/).pop() || this._filePath : 'No file open';
+
+    if (this._map) {
+      const summary = this._map.getSummary();
+      totalLines = summary.totalLines;
+      aiLines = summary.aiLines;
+      humanLines = summary.humanLines;
+      aiPct = summary.aiPercentage.toFixed(1);
+      humanPct = summary.humanPercentage.toFixed(1);
+
+      const allLines = this._map.getAllLines();
+      if (allLines.length > 0) {
+        const totalConf = allLines.reduce((sum, line) => sum + line.confidence, 0);
+        confidence = ((totalConf / allLines.length) * 100).toFixed(0);
+      }
+    }
+
     const aiPctNum = parseFloat(aiPct);
 
     this._view.webview.html = `<!DOCTYPE html>

@@ -39,7 +39,7 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.window.registerWebviewViewProvider('codeCrawler.sidebar', sidebarProvider),
   );
 
-  // Update decorations and status bar on edit
+  // Update decorations, status bar, and sidebar on edit
   let updateTimeout: ReturnType<typeof setTimeout> | undefined;
   context.subscriptions.push(
     editTracker.onUpdate((filePath) => {
@@ -51,6 +51,7 @@ export function activate(context: vscode.ExtensionContext): void {
           if (map) {
             applyDecorations(editor, map);
             statusBar.update(map);
+            sidebarProvider.updateResults(map, filePath);
           }
         }
       }, 200);
@@ -65,10 +66,14 @@ export function activate(context: vscode.ExtensionContext): void {
         if (map) {
           applyDecorations(editor, map);
           statusBar.update(map);
+          sidebarProvider.updateResults(map, editor.document.uri.fsPath);
         } else {
           clearDecorations(editor);
           statusBar.update(undefined);
+          sidebarProvider.updateResults(undefined, editor.document.uri.fsPath);
         }
+      } else {
+        sidebarProvider.updateResults(undefined, '');
       }
     }),
   );
@@ -117,20 +122,28 @@ export function activate(context: vscode.ExtensionContext): void {
           editTracker.setMap(filePath, new (await import('../../src/authorship-map')).AuthorshipMap());
         }
         const editor = vscode.window.activeTextEditor;
-        if (editor) clearDecorations(editor);
+        if (editor) {
+          clearDecorations(editor);
+          sidebarProvider.updateResults(undefined, editor.document.uri.fsPath);
+        } else {
+          sidebarProvider.updateResults(undefined, '');
+        }
         statusBar.update(undefined);
         vscode.window.showInformationMessage('Code Crawler tracking data reset.');
       }
     }),
   );
 
-  // Apply decorations on initial active editor
+  // Apply decorations and sidebar on initial active editor
   if (vscode.window.activeTextEditor) {
     const editor = vscode.window.activeTextEditor;
     const map = editTracker.getMap(editor.document.uri.fsPath);
     if (map) {
       applyDecorations(editor, map);
       statusBar.update(map);
+      sidebarProvider.updateResults(map, editor.document.uri.fsPath);
+    } else {
+      sidebarProvider.updateResults(undefined, editor.document.uri.fsPath);
     }
   }
 
