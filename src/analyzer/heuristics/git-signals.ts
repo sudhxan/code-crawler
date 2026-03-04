@@ -6,8 +6,10 @@ const GENERIC_COMMIT_MESSAGES = [
   /^implement(ed|s)?\s+\w+/i,
   /^create(d|s)?\s+\w+/i,
   /^update(d|s)?\s+\w+/i,
-  /^feat:\s/i,
-  /^fix:\s/i,
+  /^(implement|add)\s+comprehensive\s/i,
+  /^(implement|add)\s+\w+\s+with\s+\w+\s+and\s+\w+/i,  // "Add X with Y and Z"
+  /^(refactor|update)\s+\w+\s+for\s+(better|improved)\s/i,
+  /^add\s+(proper|complete|full)\s+(error|type|input)\s+(handling|checking|validation)/i,
 ];
 
 export const gitSignalsHeuristic: Heuristic = {

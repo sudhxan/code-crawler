@@ -4,6 +4,8 @@ import { commentsHeuristic } from './comments.js';
 import { structureHeuristic } from './structure.js';
 import { entropyHeuristic } from './entropy.js';
 import { gitSignalsHeuristic } from './git-signals.js';
+import { repetitionHeuristic } from './repetition.js';
+import { completenessHeuristic } from './completeness.js';
 
 export const allHeuristics: Heuristic[] = [
   namingHeuristic,
@@ -11,4 +13,6 @@ export const allHeuristics: Heuristic[] = [
   structureHeuristic,
   entropyHeuristic,
   gitSignalsHeuristic,
+  repetitionHeuristic,
+  completenessHeuristic,
 ];

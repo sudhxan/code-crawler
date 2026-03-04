@@ -4,11 +4,24 @@
   "description": "Detect AI-written vs human-written code with real-time keystroke tracking",
   "version": "0.1.0",
   "publisher": "sudhxan",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/sudhxan/code-crawler"
+  },
+  "icon": "icon.png",
+  "keywords": [
+    "ai",
+    "detection",
+    "code-analysis",
+    "copilot",
+    "cursor"
+  ],
   "engines": {
     "vscode": "^1.85.0"
   },
   "categories": [
-    "Other"
+    "Other",
+    "Linters"
   ],
   "activationEvents": [
     "onStartupFinished"
@@ -50,7 +63,7 @@
         {
           "id": "codeCrawler",
           "title": "Code Crawler",
-          "icon": "$(search)"
+          "icon": "icon.png"
         }
       ]
     },
@@ -65,13 +78,15 @@
     }
   },
   "scripts": {
-    "build": "tsc",
-    "watch": "tsc -w",
+    "vscode:prepublish": "npm run build",
+    "build": "esbuild src/extension.ts --bundle --outfile=dist/extension.js --external:vscode --format=cjs --platform=node --minify --sourcemap",
+    "watch": "esbuild src/extension.ts --bundle --outfile=dist/extension.js --external:vscode --format=cjs --platform=node --watch --sourcemap",
     "package": "vsce package"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
-    "@types/vscode": "^1.109.0",
+    "@types/vscode": "^1.85.0",
+    "esbuild": "^0.27.3",
     "typescript": "^5.4.0"
   }
 }

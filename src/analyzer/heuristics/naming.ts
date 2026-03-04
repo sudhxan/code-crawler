@@ -8,6 +8,7 @@ const GENERIC_NAMES = new Set([
   'element', 'el', 'node', 'list', 'map', 'set',
   'key', 'name', 'type', 'info', 'config', 'options', 'params',
   'args', 'ret', 'retVal', 'returnValue',
+  'context', 'state', 'payload', 'entity', 'record', 'field', 'prop', 'attr',
 ]);
 
 const IDENTIFIER_RE = /\b(?:const|let|var|function)\s+([a-zA-Z_$][a-zA-Z0-9_$]*)/g;
@@ -44,7 +45,20 @@ export const namingHeuristic: Heuristic = {
 
       const genericCount = identifiers.filter(id => GENERIC_NAMES.has(id)).length;
       const ratio = genericCount / identifiers.length;
-      const score = Math.min(ratio * 1.2, 1);
+      let score = Math.min(ratio * 1.2, 1);
+
+      // Detect overly long camelCase names (>25 chars) — AI pattern
+      const longCamelCase = /[a-z][a-zA-Z]{24,}/;
+      if (identifiers.some(id => longCamelCase.test(id))) {
+        score = Math.min(score + 0.15, 1);
+      }
+
+      // Detect AI-typical function naming patterns
+      const aiNamingPattern = /(handle|process|validate|initialize|configure|transform|normalize|sanitize)\w{10,}/;
+      const aiNameMatches = identifiers.filter(id => aiNamingPattern.test(id)).length;
+      if (identifiers.length > 0 && aiNameMatches / identifiers.length > 0.5) {
+        score = Math.min(score + 0.2, 1);
+      }
 
       const signals = genericCount > 0
         ? [{ heuristic: 'naming', score, reason: `Generic names: ${identifiers.filter(id => GENERIC_NAMES.has(id)).join(', ')}` }]

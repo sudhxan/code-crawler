@@ -1,0 +1,11 @@
+export { KeystrokeDynamics } from './keystroke-dynamics.js';
+export { SequenceAnalyzer } from './sequence-analyzer.js';
+export { CursorTracker } from './cursor-tracker.js';
+export { UndoDetector } from './undo-detector.js';
+export { AutoCloseFilter } from './auto-close-filter.js';
+export { ExtensionDetector } from './extension-detector.js';
+export { VelocityProfiler } from './velocity-profiler.js';
+export { SelectionTracker } from './selection-tracker.js';
+export { PasteDetector } from './paste-detector.js';
+export { DeletionTracker } from './deletion-tracker.js';
+export { PauseAnalyzer } from './pause-analyzer.js';

@@ -1,7 +1,15 @@
-import type { LineAuthorship, FileAuthorship, AuthorshipSummary } from './types.js';
+import type { LineAuthorship, FileAuthorship, AuthorshipSummary, SignalScores } from './types.js';
 import type { Classification } from './classifier.js';
 
+interface ClassificationWithSignals extends Classification {
+  signals?: SignalScores;
+  dominantSignal?: string;
+  fusedConfidence?: number;
+}
+
 const HUMAN_EDIT_THRESHOLD = 5;
+const CONFIDENCE_DECAY_HOURS = 24;
+const MIN_CONFIDENCE = 0.40;
 
 export class AuthorshipMap {
   private lines: Map<number, LineAuthorship> = new Map();
@@ -10,7 +18,7 @@ export class AuthorshipMap {
     startLine: number,
     linesDeleted: number,
     newLines: string[],
-    classification: Classification,
+    classification: ClassificationWithSignals,
   ): void {
     // Formatter and uncertain edits don't change authorship
     if (classification.type === 'formatter' || classification.type === 'uncertain') {
@@ -66,7 +74,20 @@ export class AuthorshipMap {
           humanEdits: editAuthor === 'human' ? (existing?.humanEdits ?? 0) + 1 : (existing?.humanEdits ?? 0),
           lastEditType: editAuthor,
           lastEditTimestamp: now,
+          signals: classification.signals,
         });
+      }
+    }
+  }
+
+  /** Apply confidence decay to stale classifications */
+  applyConfidenceDecay(): void {
+    const now = Date.now();
+    for (const line of this.lines.values()) {
+      const ageHours = (now - line.lastEditTimestamp) / (1000 * 60 * 60);
+      if (ageHours > CONFIDENCE_DECAY_HOURS) {
+        const decayFactor = Math.max(MIN_CONFIDENCE / line.confidence, 1 - (ageHours - CONFIDENCE_DECAY_HOURS) * 0.005);
+        line.confidence = Math.max(MIN_CONFIDENCE, line.confidence * decayFactor);
       }
     }
   }

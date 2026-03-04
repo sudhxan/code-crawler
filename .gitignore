@@ -3,3 +3,9 @@ dist/
 *.js.map
 .env
 .DS_Store
+ARCHITECTURE.md
+VSCODE.md
+ARCHITECTURE-V3.md
+*.vsix
+.code-crawler/
+.gemini/

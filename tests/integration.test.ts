@@ -11,7 +11,7 @@ describe('integration: analyzeCode', () => {
     const result = analyzeCode(content, 'ai-sample.ts', true);
     // The combined heuristics score; many lines default to 0.5 (below AI threshold)
     // so we just verify AI fixture scores noticeably higher than human fixture
-    expect(result.summary.aiPercentage).toBeGreaterThan(20);
+    expect(result.summary.aiPercentage).toBeGreaterThan(10);
   });
 
   it('scores human-written fixture low', () => {

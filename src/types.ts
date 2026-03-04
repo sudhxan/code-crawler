@@ -31,6 +31,8 @@ export interface LineAuthorship {
   humanEdits: number;
   lastEditType: 'ai' | 'human';
   lastEditTimestamp: number;
+  signals?: SignalScores;
+  editHistory?: EditHistoryEntry[];
 }
 
 /** Authorship data for an entire file */
@@ -57,4 +59,56 @@ export interface CommitReport {
   timestamp: number;
   files: FileAuthorship[];
   overall: AuthorshipSummary;
+}
+
+// ─── V3 Multi-Signal Detection Types ────────────────────────────
+
+/** Timestamped edit for session-level tracking */
+export interface TimestampedEdit {
+  timestamp: number;
+  line: number;
+  charsInserted: number;
+  charsDeleted: number;
+  linesInserted: number;
+}
+
+/** Cursor movement event captured from onDidChangeTextEditorSelection */
+export interface CursorEvent {
+  timestamp: number;
+  line: number;
+  character: number;
+  isSelection: boolean;
+  selectionLength: number;
+}
+
+/** Scores from all detection signals (0 = human, 1 = AI, 0.5 = no data) */
+export interface SignalScores {
+  typingRhythm: number;
+  editSize: number;
+  cursorMovement: number;
+  editSequence: number;
+  undoFrequency: number;
+  extensionSource: number;
+  velocityProfile: number;
+  selectionPattern: number;
+  pastePattern: number;
+  deletionPattern: number;
+  pausePattern: number;
+}
+
+/** Enhanced classification with multi-signal fusion */
+export interface EnhancedClassification {
+  type: 'ai' | 'human' | 'paste' | 'formatter' | 'uncertain';
+  confidence: number;
+  reason: string;
+  signals: SignalScores;
+  fusedConfidence: number;
+  dominantSignal: string;
+}
+
+/** Edit history entry for per-line tracking */
+export interface EditHistoryEntry {
+  timestamp: number;
+  type: 'ai' | 'human' | 'paste' | 'formatter';
+  charsChanged: number;
 }

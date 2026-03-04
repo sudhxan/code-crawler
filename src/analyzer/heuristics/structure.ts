@@ -81,7 +81,44 @@ export const structureHeuristic: Heuristic = {
       }
     }
 
-    const combined = (uniformityScore * 0.6 + indentScore * 0.4);
+    // Early-return pattern detection
+    let earlyReturnCount = 0;
+    let tryCatchCount = 0;
+    for (const func of functions) {
+      // Check first 3 lines of function body for guard clauses
+      const bodyStart = func.startLine + 1;
+      const bodyEnd = Math.min(bodyStart + 3, func.endLine);
+      let hasEarlyReturn = false;
+      for (let i = bodyStart; i < bodyEnd && i < lines.length; i++) {
+        if (/^\s*if\s*\(/.test(lines[i])) {
+          // Check this line and next for return/throw
+          const nearby = lines.slice(i, Math.min(i + 2, lines.length)).join(' ');
+          if (/\b(return|throw)\b/.test(nearby)) {
+            hasEarlyReturn = true;
+            break;
+          }
+        }
+      }
+      if (hasEarlyReturn) earlyReturnCount++;
+
+      // Check for try/catch in function body
+      const funcBody = lines.slice(func.startLine, func.endLine + 1).join('\n');
+      if (/\btry\s*\{/.test(funcBody) && /\bcatch\s*\(/.test(funcBody)) {
+        tryCatchCount++;
+      }
+    }
+
+    let earlyReturnBonus = 0;
+    if (functions.length > 0 && earlyReturnCount / functions.length > 0.7) {
+      earlyReturnBonus = 0.1;
+    }
+
+    let tryCatchBonus = 0;
+    if (functions.length > 0 && tryCatchCount / functions.length > 0.6) {
+      tryCatchBonus = 0.1;
+    }
+
+    const combined = (uniformityScore * 0.6 + indentScore * 0.4) + earlyReturnBonus + tryCatchBonus;
 
     // Apply score to lines within functions
     for (const func of functions) {
