@@ -6,6 +6,7 @@ dist/
 ARCHITECTURE.md
 VSCODE.md
 ARCHITECTURE-V3.md
+TEST.md
 *.vsix
 .code-crawler/
 .gemini/
